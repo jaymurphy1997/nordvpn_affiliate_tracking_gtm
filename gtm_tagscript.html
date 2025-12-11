@@ -127,8 +127,8 @@
     // JHM update 11/10/25 - replace the "/" in the page path with URL encoding safe underscores "_" 
     // JHM update 12/11/25 - convert homepage "/" to "homepage" for readability
     if (!hasParam(href, 'aff_sub2')) {
-    let pathValue = pagePath === '/' ? 'homepage' : pagePath.replace(/\//g, '_');
-    params.push('aff_sub2=' + encodeURIComponent(pathValue));
+      var pathValue = pagePath === '/' ? 'homepage' : pagePath.replace(/\//g, '_');
+      params.push('aff_sub2=' + encodeURIComponent(pathValue));
     }
     
     // Add Yep Publisher ID (aff_sub4) if available and not present
