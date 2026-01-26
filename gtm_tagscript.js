@@ -87,8 +87,8 @@
   // ===== GET A/B TEST PARAMETERS =====
 
   // Get values from Data Layer Variables
-  var dlAbVariant = {{abVariant}};
-  var dlAbTestName = {{abTestName}};
+  var dlAbVariant = {{dlv_abVariant}};
+  var dlAbTestName = {{dlv_abTestName}};
 
   console.log('GTM: Data Layer A/B Test - abVariant:', dlAbVariant, 'abTestName:', dlAbTestName);
 
