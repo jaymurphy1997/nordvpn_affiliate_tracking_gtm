@@ -83,7 +83,37 @@
   var sub_id = urlSubId || cookieSubId;
   
   console.log('GTM: Final Yep values - pub_id:', pub_id, 's2:', s2, 'sub_id:', sub_id);
-  
+
+  // ===== GET A/B TEST PARAMETERS =====
+
+  // Get values from Data Layer Variables
+  var dlAbVariant = {{abVariant}};
+  var dlAbTestName = {{abTestName}};
+
+  console.log('GTM: Data Layer A/B Test - abVariant:', dlAbVariant, 'abTestName:', dlAbTestName);
+
+  // Get value from Cookie
+  var cookieSubId3 = {{Cookie - AB Test sub_id3}};
+
+  console.log('GTM: Cookie value - sub_id3:', cookieSubId3);
+
+  // Combine abTestName and abVariant into sub_id3 format (e.g., "hero_a")
+  var dlSubId3 = null;
+  if (dlAbTestName && dlAbVariant) {
+    dlSubId3 = dlAbTestName + '_' + dlAbVariant;
+    console.log('GTM: Combined A/B test value:', dlSubId3);
+  }
+
+  // If Data Layer values exist, save combined value as cookie (30 days expiration)
+  if (dlSubId3) {
+    setCookie('ab_test_sub_id3', dlSubId3, 30);
+  }
+
+  // Use Data Layer value if available, otherwise fall back to cookie
+  var sub_id3 = dlSubId3 || cookieSubId3;
+
+  console.log('GTM: Final sub_id3 value (A/B test):', sub_id3);
+
   // ===== DECORATE NORDVPN LINKS =====
   
   var links = document.querySelectorAll('a[href*="go.nordvpn.net"]');
@@ -112,23 +142,29 @@
     if (analyticsData.user_id && !hasParam(href, 'aff_unique3')) {
       params.push('aff_unique3=' + encodeURIComponent(analyticsData.user_id));
     }
-    
+
+    // Add Timestamp (aff_unique4) if not present
+    if (!hasParam(href, 'aff_unique4')) {
+      params.push('aff_unique4=' + encodeURIComponent(Date.now()));
+    }
+
     // Add Yep S2 Click ID (aff_click_id) if available and not present
     if (s2 && !hasParam(href, 'aff_click_id')) {
       params.push('aff_click_id=' + encodeURIComponent(s2));
     }
     
     // Add Page Path (aff_sub2) if not present - NordVPN expects this here
-    // JHM update 11/10/25 - replace the "/" in the page path with URL encoding safe underscores "_" 
+    // JHM update 11/10/25 - replace the "/" in the page path with URL encoding safe underscores "_"
     if (!hasParam(href, 'aff_sub2')) {
       params.push('aff_sub2=' + encodeURIComponent(pagePath.replace(/\//g, '_')));
     }
-    
-    // Add Timestamp (aff_sub3) if not present
-    if (!hasParam(href, 'aff_sub3')) {
-      params.push('aff_sub3=' + encodeURIComponent(Date.now()));
+
+    // Add A/B Test Data (aff_sub3) if available and not present
+    if (sub_id3 && !hasParam(href, 'aff_sub3')) {
+      console.log('GTM: Adding sub_id3 to aff_sub3. Value:', sub_id3);
+      params.push('aff_sub3=' + encodeURIComponent(sub_id3));
     }
-    
+
     // Add Yep Publisher ID (aff_sub4) if available and not present
     if (pub_id && !hasParam(href, 'aff_sub4')) {
       console.log('GTM: Adding pub_id to aff_sub4. Value:', pub_id);
@@ -154,13 +190,15 @@
   
   console.log('GTM: ===== DECORATION SUMMARY =====');
   console.log('GTM: Total NordVPN links processed:', links.length);
-  console.log('GTM: GA4 Client ID:', analyticsData.client_id);
-  console.log('GTM: GA4 Session ID:', analyticsData.session_id);
-  console.log('GTM: GA4 User ID:', analyticsData.user_id || 'Not set');
-  console.log('GTM: Yep S2:', s2 || 'Not set');
-  console.log('GTM: Yep Pub ID:', pub_id, '(will be in aff_sub4)');
-  console.log('GTM: Yep Sub ID:', sub_id || 'Not set', '(will be in aff_sub5)');
-  console.log('GTM: Page Path:', pagePath, '(will be in aff_sub2)');
+  console.log('GTM: GA4 Client ID:', analyticsData.client_id, '(aff_unique1)');
+  console.log('GTM: GA4 Session ID:', analyticsData.session_id, '(aff_unique2)');
+  console.log('GTM: GA4 User ID:', analyticsData.user_id || 'Not set', '(aff_unique3)');
+  console.log('GTM: Timestamp:', Date.now(), '(aff_unique4)');
+  console.log('GTM: Yep S2:', s2 || 'Not set', '(aff_click_id)');
+  console.log('GTM: Page Path:', pagePath, '(aff_sub2)');
+  console.log('GTM: A/B Test (sub_id3):', sub_id3 || 'Not set', '(aff_sub3)');
+  console.log('GTM: Yep Pub ID:', pub_id || 'Not set', '(aff_sub4)');
+  console.log('GTM: Yep Sub ID:', sub_id || 'Not set', '(aff_sub5)');
   console.log('GTM: Note: aff_sub keeps its original value (e.g., y1)');
   console.log('GTM: Script completed successfully');
 })();
