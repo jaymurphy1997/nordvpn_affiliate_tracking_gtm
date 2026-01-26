@@ -115,81 +115,136 @@
   console.log('GTM: Final sub_id3 value (A/B test):', sub_id3);
 
   // ===== DECORATE NORDVPN LINKS =====
-  
-  var links = document.querySelectorAll('a[href*="go.nordvpn.net"]');
-  console.log('GTM: Found', links.length, 'NordVPN links to decorate');
-  
-  for (var i = 0; i < links.length; i++) {
-    var link = links[i];
-    var href = link.href;
-    var params = [];
-    
-    console.log('GTM: Processing link', i + 1, ':', href);
-    
-    // NOTE: We're keeping existing aff_sub (like y1) - not modifying it
-    
-    // Add GA4 Client ID (aff_unique1) if not present
-    if (!hasParam(href, 'aff_unique1')) {
-      params.push('aff_unique1=' + encodeURIComponent(analyticsData.client_id));
-    }
-    
-    // Add GA4 Session ID (aff_unique2) if not present
-    if (!hasParam(href, 'aff_unique2')) {
-      params.push('aff_unique2=' + encodeURIComponent(analyticsData.session_id));
-    }
-    
-    // Add GA4 User ID (aff_unique3) if available and not present
-    if (analyticsData.user_id && !hasParam(href, 'aff_unique3')) {
-      params.push('aff_unique3=' + encodeURIComponent(analyticsData.user_id));
+
+  // Function to decorate a single link or all links
+  function decorateLinks(targetLinks) {
+    var links = targetLinks || document.querySelectorAll('a[href*="go.nordvpn.net"]');
+    var linksArray = Array.prototype.slice.call(links);
+    var decoratedCount = 0;
+
+    for (var i = 0; i < linksArray.length; i++) {
+      var link = linksArray[i];
+
+      // Skip if already decorated (marked with data attribute)
+      if (link.getAttribute('data-gtm-decorated') === 'true') {
+        continue;
+      }
+
+      var href = link.href;
+      var params = [];
+
+      console.log('GTM: Processing link:', href);
+
+      // NOTE: We're keeping existing aff_sub (like y1) - not modifying it
+
+      // Add GA4 Client ID (aff_unique1) if not present
+      if (!hasParam(href, 'aff_unique1')) {
+        params.push('aff_unique1=' + encodeURIComponent(analyticsData.client_id));
+      }
+
+      // Add GA4 Session ID (aff_unique2) if not present
+      if (!hasParam(href, 'aff_unique2')) {
+        params.push('aff_unique2=' + encodeURIComponent(analyticsData.session_id));
+      }
+
+      // Add GA4 User ID (aff_unique3) if available and not present
+      if (analyticsData.user_id && !hasParam(href, 'aff_unique3')) {
+        params.push('aff_unique3=' + encodeURIComponent(analyticsData.user_id));
+      }
+
+      // Add Timestamp (aff_unique4) if not present
+      if (!hasParam(href, 'aff_unique4')) {
+        params.push('aff_unique4=' + encodeURIComponent(Date.now()));
+      }
+
+      // Add Yep S2 Click ID (aff_click_id) if available and not present
+      if (s2 && !hasParam(href, 'aff_click_id')) {
+        params.push('aff_click_id=' + encodeURIComponent(s2));
+      }
+
+      // Add Page Path (aff_sub2) if not present - NordVPN expects this here
+      // JHM update 11/10/25 - replace the "/" in the page path with URL encoding safe underscores "_"
+      if (!hasParam(href, 'aff_sub2')) {
+        params.push('aff_sub2=' + encodeURIComponent(pagePath.replace(/\//g, '_')));
+      }
+
+      // Add A/B Test Data (aff_sub3) if available and not present
+      if (sub_id3 && !hasParam(href, 'aff_sub3')) {
+        console.log('GTM: Adding sub_id3 to aff_sub3. Value:', sub_id3);
+        params.push('aff_sub3=' + encodeURIComponent(sub_id3));
+      }
+
+      // Add Yep Publisher ID (aff_sub4) if available and not present
+      if (pub_id && !hasParam(href, 'aff_sub4')) {
+        console.log('GTM: Adding pub_id to aff_sub4. Value:', pub_id);
+        params.push('aff_sub4=' + encodeURIComponent(pub_id));
+      }
+
+      // Add Yep Sub ID (aff_sub5) if available and not present
+      if (sub_id && !hasParam(href, 'aff_sub5')) {
+        console.log('GTM: Adding sub_id to aff_sub5. Value:', sub_id);
+        params.push('aff_sub5=' + encodeURIComponent(sub_id));
+      }
+
+      // Only update link if there are new parameters to add
+      if (params.length > 0) {
+        var separator = href.indexOf('?') === -1 ? '?' : '&';
+        link.href = href + separator + params.join('&');
+        console.log('GTM: ✓ Link decorated with:', params.join('&'));
+        console.log('GTM: ✓ Final URL:', link.href);
+        decoratedCount++;
+      } else {
+        console.log('GTM: ○ Link skipped - all parameters already present');
+      }
+
+      // Mark link as decorated
+      link.setAttribute('data-gtm-decorated', 'true');
     }
 
-    // Add Timestamp (aff_unique4) if not present
-    if (!hasParam(href, 'aff_unique4')) {
-      params.push('aff_unique4=' + encodeURIComponent(Date.now()));
-    }
-
-    // Add Yep S2 Click ID (aff_click_id) if available and not present
-    if (s2 && !hasParam(href, 'aff_click_id')) {
-      params.push('aff_click_id=' + encodeURIComponent(s2));
-    }
-    
-    // Add Page Path (aff_sub2) if not present - NordVPN expects this here
-    // JHM update 11/10/25 - replace the "/" in the page path with URL encoding safe underscores "_"
-    if (!hasParam(href, 'aff_sub2')) {
-      params.push('aff_sub2=' + encodeURIComponent(pagePath.replace(/\//g, '_')));
-    }
-
-    // Add A/B Test Data (aff_sub3) if available and not present
-    if (sub_id3 && !hasParam(href, 'aff_sub3')) {
-      console.log('GTM: Adding sub_id3 to aff_sub3. Value:', sub_id3);
-      params.push('aff_sub3=' + encodeURIComponent(sub_id3));
-    }
-
-    // Add Yep Publisher ID (aff_sub4) if available and not present
-    if (pub_id && !hasParam(href, 'aff_sub4')) {
-      console.log('GTM: Adding pub_id to aff_sub4. Value:', pub_id);
-      params.push('aff_sub4=' + encodeURIComponent(pub_id));
-    }
-    
-    // Add Yep Sub ID (aff_sub5) if available and not present
-    if (sub_id && !hasParam(href, 'aff_sub5')) {
-      console.log('GTM: Adding sub_id to aff_sub5. Value:', sub_id);
-      params.push('aff_sub5=' + encodeURIComponent(sub_id));
-    }
-    
-    // Only update link if there are new parameters to add
-    if (params.length > 0) {
-      var separator = href.indexOf('?') === -1 ? '?' : '&';
-      link.href = href + separator + params.join('&');
-      console.log('GTM: ✓ Link', i + 1, 'decorated with:', params.join('&'));
-      console.log('GTM: ✓ Final URL:', link.href);
-    } else {
-      console.log('GTM: ○ Link', i + 1, 'skipped - all parameters already present');
-    }
+    return decoratedCount;
   }
-  
+
+  // Decorate existing links on page load
+  console.log('GTM: Decorating existing links...');
+  var initialCount = decorateLinks();
+  console.log('GTM: Decorated', initialCount, 'initial links');
+
+  // Set up MutationObserver to watch for new links
+  var observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+      if (mutation.addedNodes && mutation.addedNodes.length > 0) {
+        for (var i = 0; i < mutation.addedNodes.length; i++) {
+          var node = mutation.addedNodes[i];
+
+          // Check if the added node is a link
+          if (node.nodeType === 1 && node.tagName === 'A' && node.href && node.href.indexOf('go.nordvpn.net') !== -1) {
+            console.log('GTM: New NordVPN link detected:', node.href);
+            decorateLinks([node]);
+          }
+
+          // Check if the added node contains links
+          if (node.nodeType === 1 && node.querySelectorAll) {
+            var newLinks = node.querySelectorAll('a[href*="go.nordvpn.net"]');
+            if (newLinks.length > 0) {
+              console.log('GTM: Found', newLinks.length, 'new NordVPN links in added content');
+              decorateLinks(newLinks);
+            }
+          }
+        }
+      }
+    });
+  });
+
+  // Start observing the document body for changes
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  console.log('GTM: MutationObserver active - watching for new NordVPN links');
+
   console.log('GTM: ===== DECORATION SUMMARY =====');
-  console.log('GTM: Total NordVPN links processed:', links.length);
+  console.log('GTM: Total NordVPN links processed:', initialCount);
   console.log('GTM: GA4 Client ID:', analyticsData.client_id, '(aff_unique1)');
   console.log('GTM: GA4 Session ID:', analyticsData.session_id, '(aff_unique2)');
   console.log('GTM: GA4 User ID:', analyticsData.user_id || 'Not set', '(aff_unique3)');
