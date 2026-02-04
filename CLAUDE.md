@@ -29,8 +29,6 @@ These are the GTM variable references. Do not modify the variable names — they
 | `{{dlv_abVariant}}` | Data Layer Variable | A/B test variant (e.g., "a", "b") |
 | `{{dlv_abTestName}}` | Data Layer Variable | A/B test name (e.g., "hero") |
 | `{{Cookie - AB Test sub_id3}}` | 1st Party Cookie | `ab_test_sub_id3` cookie value |
-| `{{dlv_track_label}}` | Data Layer Variable | Track label for aff_sub (e.g., "y1", "email", "social") |
-| `{{Cookie - Track Label}}` | 1st Party Cookie | `track_label` cookie value |
 
 ## URL Parameter Mapping
 
@@ -38,7 +36,7 @@ The script appends the following parameters to `go.nordvpn.net` URLs:
 
 | URL Parameter | Source | Purpose | Required |
 |---|---|---|---|
-| `aff_sub` | Track Label (`dlv_track_label`) | Traffic source identification (e.g., "y1", "email", "social") | No |
+| `aff_sub` | `data-track-label` attribute on link | Traffic source identification (e.g., "y1", "email", "social") | No |
 | `aff_unique1` | GA4 Client ID | Cross-session user identification | Yes |
 | `aff_unique2` | GA4 Session ID | Session attribution | Yes |
 | `aff_unique3` | GA4 User ID | Logged-in user tracking | No |
@@ -49,8 +47,13 @@ The script appends the following parameters to `go.nordvpn.net` URLs:
 | `aff_sub4` | Yep Publisher ID | Yep publisher attribution | No |
 | `aff_sub5` | Yep Sub ID | Yep sub-channel attribution | No |
 
-### `aff_sub` from Data Layer
-The `aff_sub` parameter is populated from the `dlv_track_label` Data Layer Variable. This value persists across pages via cookie storage (30 days). It appears as "Sub ID 1" in NordVPN reporting and is used to identify traffic sources.
+### `aff_sub` from Data Attribute
+The `aff_sub` parameter is read from the `data-track-label` attribute on each NordVPN link. The script reads this attribute during initial decoration, MutationObserver decoration, and on click (as a final fallback). If the attribute exists, the value is set or replaced in the URL. This allows per-link tracking values. It appears as "Sub ID 1" in NordVPN reporting and is used to identify traffic sources.
+
+**Example link HTML:**
+```html
+<a href="https://go.nordvpn.net/aff_c?offer_id=15&aff_id=XXXXX" data-track-label="email">Get NordVPN</a>
+```
 
 ## Script Architecture
 

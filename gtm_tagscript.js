@@ -44,6 +44,37 @@
     return url.indexOf(paramName + '=') !== -1;
   }
 
+  // Function to set or replace a URL parameter
+  // JHM update 02/04/26 - Used for aff_sub to replace existing value if present
+  function setOrReplaceParam(url, paramName, paramValue) {
+    var urlObj = url.split('?');
+    var baseUrl = urlObj[0];
+    var queryString = urlObj[1] || '';
+    var params = [];
+    var paramAdded = false;
+
+    if (queryString) {
+      var pairs = queryString.split('&');
+      for (var i = 0; i < pairs.length; i++) {
+        var pair = pairs[i].split('=');
+        if (pair[0] === paramName) {
+          // Replace existing parameter
+          params.push(paramName + '=' + encodeURIComponent(paramValue));
+          paramAdded = true;
+        } else {
+          params.push(pairs[i]);
+        }
+      }
+    }
+
+    // Add parameter if it wasn't replaced
+    if (!paramAdded) {
+      params.push(paramName + '=' + encodeURIComponent(paramValue));
+    }
+
+    return baseUrl + (params.length > 0 ? '?' + params.join('&') : '');
+  }
+
   // Function to get GA4 Client ID from _ga cookie
   // Format: GA1.1.XXXXXXXXXX.XXXXXXXXXX -> extract last two segments
   function getGA4ClientIdFromCookie() {
@@ -147,28 +178,6 @@
 
   console.log('GTM: Final sub_id3 value (A/B test):', sub_id3);
 
-  // ===== GET TRACK LABEL (aff_sub) =====
-
-  // Get value from Data Layer Variable
-  var dlTrackLabel = {{dlv_track_label}};
-
-  console.log('GTM: Data Layer track_label:', dlTrackLabel);
-
-  // Get value from Cookie
-  var cookieTrackLabel = {{Cookie - Track Label}};
-
-  console.log('GTM: Cookie value - track_label:', cookieTrackLabel);
-
-  // If Data Layer value exists, save it as cookie (30 days expiration)
-  if (dlTrackLabel) {
-    setCookie('track_label', dlTrackLabel, 30);
-  }
-
-  // Use Data Layer value if available, otherwise fall back to cookie
-  var track_label = dlTrackLabel || cookieTrackLabel;
-
-  console.log('GTM: Final track_label value (aff_sub):', track_label);
-
   // ===== DECORATE NORDVPN LINKS =====
 
   // Function to decorate a single link or all links
@@ -190,11 +199,13 @@
 
       console.log('GTM: Processing link:', href);
 
-      // Add Track Label (aff_sub) if available and not present
-      // JHM update 02/04/26 - Now populating aff_sub from dlv_track_label
-      if (track_label && !hasParam(href, 'aff_sub')) {
-        console.log('GTM: Adding track_label to aff_sub. Value:', track_label);
-        params.push('aff_sub=' + encodeURIComponent(track_label));
+      // Get track label from data attribute and set/replace aff_sub
+      // JHM update 02/04/26 - Now reading from data-track-label attribute on each link
+      var trackLabel = link.getAttribute('data-track-label');
+      if (trackLabel) {
+        console.log('GTM: Setting aff_sub from data-track-label. Value:', trackLabel);
+        href = setOrReplaceParam(href, 'aff_sub', trackLabel);
+        link.href = href;
       }
 
       // Add GA4 Client ID (aff_unique1) if not present
@@ -323,9 +334,13 @@
     var params = [];
     var modified = false;
 
-    // Add track_label to aff_sub if available and missing
-    if (track_label && !hasParam(href, 'aff_sub')) {
-      params.push('aff_sub=' + encodeURIComponent(track_label));
+    // Get track label from data attribute and set/replace aff_sub
+    // JHM update 02/04/26 - Read from data-track-label on click for last-minute decoration
+    var trackLabel = target.getAttribute('data-track-label');
+    if (trackLabel) {
+      console.log('GTM: Click handler setting aff_sub from data-track-label. Value:', trackLabel);
+      href = setOrReplaceParam(href, 'aff_sub', trackLabel);
+      target.href = href;
     }
 
     // Try to get GA4 data from cookies if not in URL
@@ -390,7 +405,7 @@
 
   console.log('GTM: ===== DECORATION SUMMARY =====');
   console.log('GTM: Initial links decorated:', initialCount);
-  console.log('GTM: Track Label:', track_label || 'Not set', '(aff_sub)');
+  console.log('GTM: Track Label: (read from data-track-label per link)', '(aff_sub)');
   console.log('GTM: GA4 Client ID:', (analyticsData && analyticsData.client_id) || 'Not available (will use cookie fallback on click)', '(aff_unique1)');
   console.log('GTM: GA4 Session ID:', (analyticsData && analyticsData.session_id) || 'Not available (will use cookie fallback on click)', '(aff_unique2)');
   console.log('GTM: GA4 User ID:', (analyticsData && analyticsData.user_id) || 'Not set', '(aff_unique3)');
