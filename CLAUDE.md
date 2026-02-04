@@ -48,7 +48,7 @@ The script appends the following parameters to `go.nordvpn.net` URLs:
 | `aff_sub5` | Yep Sub ID | Yep sub-channel attribution | No |
 
 ### `aff_sub` from Data Attribute
-The `aff_sub` parameter is read from the `data-track-label` attribute on each NordVPN link. The script reads this attribute during initial decoration, MutationObserver decoration, and on click (as a final fallback). If the attribute exists, the value is set or replaced in the URL. This allows per-link tracking values. It appears as "Sub ID 1" in NordVPN reporting and is used to identify traffic sources.
+The `aff_sub` parameter is read from the `data-track-label` attribute on each NordVPN link. The script reads this attribute during initial decoration, MutationObserver decoration, and on click (as a final fallback). **If `aff_sub` already exists in the URL, it is preserved.** Only if `aff_sub` is not present will the script add it from the data attribute. This allows per-link tracking values while respecting pre-existing values. It appears as "Sub ID 1" in NordVPN reporting and is used to identify traffic sources.
 
 **Example link HTML:**
 ```html

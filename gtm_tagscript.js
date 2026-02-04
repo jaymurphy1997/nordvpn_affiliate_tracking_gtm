@@ -199,10 +199,10 @@
 
       console.log('GTM: Processing link:', href);
 
-      // Get track label from data attribute and set/replace aff_sub
-      // JHM update 02/04/26 - Now reading from data-track-label attribute on each link
+      // Get track label from data attribute and set aff_sub if not already present
+      // JHM update 02/04/26 - Only set if aff_sub doesn't already exist (preserve existing values)
       var trackLabel = link.getAttribute('data-track-label');
-      if (trackLabel) {
+      if (trackLabel && !hasParam(href, 'aff_sub')) {
         console.log('GTM: Setting aff_sub from data-track-label. Value:', trackLabel);
         href = setOrReplaceParam(href, 'aff_sub', trackLabel);
         link.href = href;
@@ -334,10 +334,10 @@
     var params = [];
     var modified = false;
 
-    // Get track label from data attribute and set/replace aff_sub
-    // JHM update 02/04/26 - Read from data-track-label on click for last-minute decoration
+    // Get track label from data attribute and set aff_sub if not already present
+    // JHM update 02/04/26 - Only set if aff_sub doesn't already exist (preserve existing values)
     var trackLabel = target.getAttribute('data-track-label');
-    if (trackLabel) {
+    if (trackLabel && !hasParam(href, 'aff_sub')) {
       console.log('GTM: Click handler setting aff_sub from data-track-label. Value:', trackLabel);
       href = setOrReplaceParam(href, 'aff_sub', trackLabel);
       target.href = href;
