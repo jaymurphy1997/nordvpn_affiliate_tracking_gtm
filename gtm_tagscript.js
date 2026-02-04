@@ -1,17 +1,17 @@
 <script>
 (function() {
   console.log('GTM: Affiliate Link Decoration Script Started');
-  
+
   // Get Analytics Data
   var analyticsData = {{Analytics data}};
   console.log('GTM: Analytics data:', analyticsData);
-  
+
+  // JHM update 02/04/26 - Don't exit if GA4 data unavailable; decorate with available data and use click handler fallback
   if (!analyticsData || !analyticsData.client_id || !analyticsData.session_id) {
-    console.log('GTM: No analytics data available - Script terminated');
-    return;
+    console.log('GTM: Analytics data not available yet - will use cookie fallback on click');
+  } else {
+    console.log('GTM: Analytics validated - client_id:', analyticsData.client_id, 'session_id:', analyticsData.session_id);
   }
-  
-  console.log('GTM: Analytics validated - client_id:', analyticsData.client_id, 'session_id:', analyticsData.session_id);
   
   // ===== HELPER FUNCTIONS =====
   
@@ -43,10 +43,43 @@
   function hasParam(url, paramName) {
     return url.indexOf(paramName + '=') !== -1;
   }
-  
+
+  // Function to get GA4 Client ID from _ga cookie
+  // Format: GA1.1.XXXXXXXXXX.XXXXXXXXXX -> extract last two segments
+  function getGA4ClientIdFromCookie() {
+    var gaCookie = getCookie('_ga');
+    if (!gaCookie) return null;
+    var parts = gaCookie.split('.');
+    if (parts.length >= 4) {
+      return parts[2] + '.' + parts[3];
+    }
+    return null;
+  }
+
+  // Function to get GA4 Session ID from _ga_XXXXXX cookie
+  // Format: GS2.1.SESSION_ID.TIMESTAMP... -> extract third segment
+  function getGA4SessionIdFromCookie() {
+    var cookies = document.cookie.split(';');
+    for (var i = 0; i < cookies.length; i++) {
+      var cookie = cookies[i].trim();
+      if (cookie.indexOf('_ga_') === 0) {
+        var value = cookie.split('=')[1];
+        if (value) {
+          var parts = value.split('.');
+          if (parts.length >= 3) {
+            return parts[2];
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   // ===== GET PAGE PATH =====
-  var pagePath = window.location.pathname;
-  console.log('GTM: Current page path:', pagePath);
+  var rawPath = window.location.pathname;
+  // JHM update 02/04/26 - Handle homepage: blank or "/" becomes "homepage", others get slashes replaced with underscores
+  var pagePath = (rawPath === '/' || rawPath === '') ? 'homepage' : rawPath.replace(/\//g, '_');
+  console.log('GTM: Current page path:', rawPath, '-> formatted:', pagePath);
   
   // ===== GET YEP TRACKING PARAMETERS =====
   
@@ -114,6 +147,28 @@
 
   console.log('GTM: Final sub_id3 value (A/B test):', sub_id3);
 
+  // ===== GET TRACK LABEL (aff_sub) =====
+
+  // Get value from Data Layer Variable
+  var dlTrackLabel = {{dlv_track_label}};
+
+  console.log('GTM: Data Layer track_label:', dlTrackLabel);
+
+  // Get value from Cookie
+  var cookieTrackLabel = {{Cookie - Track Label}};
+
+  console.log('GTM: Cookie value - track_label:', cookieTrackLabel);
+
+  // If Data Layer value exists, save it as cookie (30 days expiration)
+  if (dlTrackLabel) {
+    setCookie('track_label', dlTrackLabel, 30);
+  }
+
+  // Use Data Layer value if available, otherwise fall back to cookie
+  var track_label = dlTrackLabel || cookieTrackLabel;
+
+  console.log('GTM: Final track_label value (aff_sub):', track_label);
+
   // ===== DECORATE NORDVPN LINKS =====
 
   // Function to decorate a single link or all links
@@ -135,20 +190,25 @@
 
       console.log('GTM: Processing link:', href);
 
-      // NOTE: We're keeping existing aff_sub (like y1) - not modifying it
+      // Add Track Label (aff_sub) if available and not present
+      // JHM update 02/04/26 - Now populating aff_sub from dlv_track_label
+      if (track_label && !hasParam(href, 'aff_sub')) {
+        console.log('GTM: Adding track_label to aff_sub. Value:', track_label);
+        params.push('aff_sub=' + encodeURIComponent(track_label));
+      }
 
       // Add GA4 Client ID (aff_unique1) if not present
-      if (!hasParam(href, 'aff_unique1')) {
+      if (analyticsData && analyticsData.client_id && !hasParam(href, 'aff_unique1')) {
         params.push('aff_unique1=' + encodeURIComponent(analyticsData.client_id));
       }
 
       // Add GA4 Session ID (aff_unique2) if not present
-      if (!hasParam(href, 'aff_unique2')) {
+      if (analyticsData && analyticsData.session_id && !hasParam(href, 'aff_unique2')) {
         params.push('aff_unique2=' + encodeURIComponent(analyticsData.session_id));
       }
 
       // Add GA4 User ID (aff_unique3) if available and not present
-      if (analyticsData.user_id && !hasParam(href, 'aff_unique3')) {
+      if (analyticsData && analyticsData.user_id && !hasParam(href, 'aff_unique3')) {
         params.push('aff_unique3=' + encodeURIComponent(analyticsData.user_id));
       }
 
@@ -162,10 +222,9 @@
         params.push('aff_click_id=' + encodeURIComponent(s2));
       }
 
-      // Add Page Path (aff_sub2) if not present - NordVPN expects this here
-      // JHM update 11/10/25 - replace the "/" in the page path with URL encoding safe underscores "_"
+      // Add Page Path (aff_sub2) if not present
       if (!hasParam(href, 'aff_sub2')) {
-        params.push('aff_sub2=' + encodeURIComponent(pagePath.replace(/\//g, '_')));
+        params.push('aff_sub2=' + encodeURIComponent(pagePath));
       }
 
       // Add A/B Test Data (aff_sub3) if available and not present
@@ -243,18 +302,108 @@
 
   console.log('GTM: MutationObserver active - watching for new NordVPN links');
 
+  // ===== CLICK HANDLER (CAPTURE PHASE) =====
+  // JHM update 02/04/26 - Last line of defense: fills in GA4 data from cookies if missing
+  document.addEventListener('click', function(e) {
+    var target = e.target;
+
+    // Find the closest anchor tag (in case user clicked child element)
+    while (target && target.tagName !== 'A') {
+      target = target.parentElement;
+    }
+
+    // Check if it's a NordVPN link
+    if (!target || !target.href || target.href.indexOf('go.nordvpn.net') === -1) {
+      return;
+    }
+
+    console.log('GTM: Click detected on NordVPN link:', target.href);
+
+    var href = target.href;
+    var params = [];
+    var modified = false;
+
+    // Add track_label to aff_sub if available and missing
+    if (track_label && !hasParam(href, 'aff_sub')) {
+      params.push('aff_sub=' + encodeURIComponent(track_label));
+    }
+
+    // Try to get GA4 data from cookies if not in URL
+    if (!hasParam(href, 'aff_unique1')) {
+      var clientId = getGA4ClientIdFromCookie();
+      if (clientId) {
+        params.push('aff_unique1=' + encodeURIComponent(clientId));
+        console.log('GTM: Added client_id from cookie:', clientId);
+      }
+    }
+
+    if (!hasParam(href, 'aff_unique2')) {
+      var sessionId = getGA4SessionIdFromCookie();
+      if (sessionId) {
+        params.push('aff_unique2=' + encodeURIComponent(sessionId));
+        console.log('GTM: Added session_id from cookie:', sessionId);
+      }
+    }
+
+    // Add timestamp if missing
+    if (!hasParam(href, 'aff_unique4')) {
+      params.push('aff_unique4=' + encodeURIComponent(Date.now()));
+    }
+
+    // Add page path if missing
+    if (!hasParam(href, 'aff_sub2')) {
+      params.push('aff_sub2=' + encodeURIComponent(pagePath));
+    }
+
+    // Add A/B test if available and missing
+    if (sub_id3 && !hasParam(href, 'aff_sub3')) {
+      params.push('aff_sub3=' + encodeURIComponent(sub_id3));
+    }
+
+    // Add Yep S2 if available and missing
+    if (s2 && !hasParam(href, 'aff_click_id')) {
+      params.push('aff_click_id=' + encodeURIComponent(s2));
+    }
+
+    // Add Yep pub_id if available and missing
+    if (pub_id && !hasParam(href, 'aff_sub4')) {
+      params.push('aff_sub4=' + encodeURIComponent(pub_id));
+    }
+
+    // Add Yep sub_id if available and missing
+    if (sub_id && !hasParam(href, 'aff_sub5')) {
+      params.push('aff_sub5=' + encodeURIComponent(sub_id));
+    }
+
+    // Update the link if needed
+    if (params.length > 0) {
+      var separator = href.indexOf('?') === -1 ? '?' : '&';
+      target.href = href + separator + params.join('&');
+      console.log('GTM: Click handler added missing parameters:', params.join('&'));
+      console.log('GTM: Final click URL:', target.href);
+    } else {
+      console.log('GTM: Click handler - all parameters already present');
+    }
+  }, true); // Use capture phase
+
+  console.log('GTM: Click handler active (capture phase)');
+
   console.log('GTM: ===== DECORATION SUMMARY =====');
-  console.log('GTM: Total NordVPN links processed:', initialCount);
-  console.log('GTM: GA4 Client ID:', analyticsData.client_id, '(aff_unique1)');
-  console.log('GTM: GA4 Session ID:', analyticsData.session_id, '(aff_unique2)');
-  console.log('GTM: GA4 User ID:', analyticsData.user_id || 'Not set', '(aff_unique3)');
-  console.log('GTM: Timestamp:', Date.now(), '(aff_unique4)');
+  console.log('GTM: Initial links decorated:', initialCount);
+  console.log('GTM: Track Label:', track_label || 'Not set', '(aff_sub)');
+  console.log('GTM: GA4 Client ID:', (analyticsData && analyticsData.client_id) || 'Not available (will use cookie fallback on click)', '(aff_unique1)');
+  console.log('GTM: GA4 Session ID:', (analyticsData && analyticsData.session_id) || 'Not available (will use cookie fallback on click)', '(aff_unique2)');
+  console.log('GTM: GA4 User ID:', (analyticsData && analyticsData.user_id) || 'Not set', '(aff_unique3)');
+  console.log('GTM: Timestamp: (generated per link)', '(aff_unique4)');
   console.log('GTM: Yep S2:', s2 || 'Not set', '(aff_click_id)');
   console.log('GTM: Page Path:', pagePath, '(aff_sub2)');
-  console.log('GTM: A/B Test (sub_id3):', sub_id3 || 'Not set', '(aff_sub3)');
+  console.log('GTM: A/B Test:', sub_id3 || 'Not set', '(aff_sub3)');
   console.log('GTM: Yep Pub ID:', pub_id || 'Not set', '(aff_sub4)');
   console.log('GTM: Yep Sub ID:', sub_id || 'Not set', '(aff_sub5)');
-  console.log('GTM: Note: aff_sub keeps its original value (e.g., y1)');
-  console.log('GTM: Script completed successfully');
+  console.log('GTM: ===== THREE-LAYER DECORATION ACTIVE =====');
+  console.log('GTM: 1. Initial decoration complete');
+  console.log('GTM: 2. MutationObserver watching for dynamic links');
+  console.log('GTM: 3. Click handler ready for GA4 cookie fallback');
+  console.log('GTM: Script initialization complete');
 })();
 </script>
